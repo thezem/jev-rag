@@ -1,0 +1,23 @@
+import { mkdtemp, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { JevOne, PointKernel } from 'jev-one';
+import { VercelJevProvider } from 'jev-one/gateway';
+import { JevRetrieval } from '../src/index.js';
+
+if (!process.env.AI_GATEWAY_API_KEY) throw new Error('Set AI_GATEWAY_API_KEY.');
+const directory = await mkdtemp(join(tmpdir(), 'jev-retrieval-paged-'));
+const rag = new JevRetrieval(new JevOne(new PointKernel(new VercelJevProvider({ apiKey: process.env.AI_GATEWAY_API_KEY }))), join(directory, 'corpus.json'), 300);
+for (let i = 0; i < 11; i++) await rag.import({ id: `f${i}`, source: `memory://f${i}`, text: `Archive record ${i} concerns wooden furniture inventory.`, metadata: { group: 'archive' } });
+await rag.import({ id: 'atlas', source: 'memory://atlas', text: 'The emergency override for the Atlas scanner is the red lever behind its service panel.', metadata: { group: 'manual' } });
+const long = `# First\n\n${'A long section about ocean currents and tidal measurement. '.repeat(30)}\n\n# Second\n\n${'A section about coral migration and warmer water. '.repeat(30)}`;
+await rag.import({ id: 'long', source: 'memory://long', text: long, metadata: { group: 'marine' } });
+const stored = JSON.parse(await readFile(join(directory, 'corpus.json'), 'utf8'));
+const chunks = stored.documents.find(item => item.id === 'long').chunks;
+if (chunks.length < 2 || chunks.some(chunk => !long.slice(chunk.metadata.start, chunk.metadata.end).includes(chunk.text))) throw new Error('Long-document chunk offsets failed.');
+const result = await rag.retrieve('How do I override the Atlas scanner in an emergency?', { minItems: 1, maxItems: 1, pageSize: 5, maxPages: 4, maxDecisions: 20, filter: metadata => metadata.group !== 'marine' });
+if (result.items[0]?.documentId !== 'atlas' || result.pagesFetched < 3) throw new Error('Jev did not reach the relevant later page.');
+await rag.import({ id: 'atlas', source: 'memory://atlas', text: 'The scanner is now retired.', metadata: { group: 'manual' } });
+if ((await rag.list()).length !== 13 || !(await rag.remove('atlas'))) throw new Error('Replacement or removal failed.');
+console.log(JSON.stringify({ corpus: directory, longChunks: chunks.length, retrieved: result.items[0], pagesFetched: result.pagesFetched, decisions: result.decisions }, null, 2));
+console.log('PAGED LONG-DOCUMENT E2E PASS');

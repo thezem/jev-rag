@@ -1,0 +1,32 @@
+{
+  "name": "jev-rag",
+  "version": "0.1.0",
+  "description": "Vectorless, local document retrieval with Jev One as the semantic operator",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "docs",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "jev-one": ">=0.3.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "scripts": {
+    "e2e": "node examples/basic.js && node examples/paged.js",
+    "check": "node --check src/index.js && npm run e2e"
+  }
+}
